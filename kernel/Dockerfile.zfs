@@ -26,8 +26,34 @@ RUN tar xf kernel-dev.tar
 COPY --from=ksrc /kernel.tar /
 RUN tar xf kernel.tar
 
+RUN git config --global url.https://.insteadOf git://
+
+
+RUN wget https://pkg.linbit.com//downloads/drbd/9/drbd-9.2.7.tar.gz && \
+    tar xf drbd-9.2.7.tar.gz && \
+    cd drbd-9.2.7 && \
+    sed -i "s/cp -t \$(dir) \$(obj)\/compat.h/cp \$(obj)\/compat.h \$(dir)\//" drbd/Kbuild
+
+RUN (cd /drbd-9.2.7 && KDIR=/usr/src/linux-headers-5.10.104-linuxkit make -j "$(getconf _NPROCESSORS_ONLN)" )
+RUN touch /drbd-9.2.7/drbd/drbd_transport_rdma.ko
+RUN (cd /drbd-9.2.7 && KDIR=/usr/src/linux-headers-5.10.104-linuxkit make -j "$(getconf _NPROCESSORS_ONLN)" install)
+RUN rm /lib/modules/5.10.104-linuxkit/updates/drbd_transport_rdma.ko
+
+# ENV DRBD_REPO=https://github.com/LINBIT/drbd
+# ENV DRBD_COMMIT=drbd-9.2.7
+# RUN git clone ${DRBD_REPO} && \
+#     cd drbd && \
+#     git checkout ${DRBD_COMMIT} && \
+#     sed -i "s/cp -t \$(dir) \$(obj)\/compat.h/cp \$(obj)\/compat.h \$(dir)\//" drbd/Kbuild && \
+#     touch drbd/.drbd_git_revision
+
+# WORKDIR /drbd
+# RUN KDIR=/usr/src/linux-headers-5.10.104-linuxkit make -j "$(getconf _NPROCESSORS_ONLN)" && \
+#     make install
+
 # SPL is part of the ZFS repo since 0.8.0 (https://github.com/zfsonlinux/zfs/releases/tag/zfs-0.8.0)
-ENV VERSION=0.8.1
+#ENV VERSION=0.8.1
+ENV VERSION=2.0.7
 
 ENV ZFS_REPO=https://github.com/zfsonlinux/zfs.git
 ENV ZFS_COMMIT=zfs-${VERSION}
@@ -35,13 +61,12 @@ RUN git clone ${ZFS_REPO} && \
     cd zfs && \
     git checkout ${ZFS_COMMIT}
 
-WORKDIR /zfs
-RUN ./autogen.sh && \
+RUN ( cd zfs && ./autogen.sh && \
     ./configure && \
     ./scripts/make_gitrev.sh && \
     cd module && \
     make -j "$(getconf _NPROCESSORS_ONLN)" && \
-    make install
+    make install )
 
 # Run depmod against the new module directory.
 RUN cd /lib/modules && \

@@ -106,7 +106,7 @@ RUN set -e && \
 RUN XZ_DEFAULTS="-T0" tar cJf /out/src/linux.tar.xz /linux
 
 # Kernel config
-RUN case $(uname -m) in \
+RUN set -x; case $(uname -m) in \
     x86_64) \
         KERNEL_DEF_CONF=/linux/arch/x86/configs/x86_64_defconfig; \
         ;; \
@@ -119,14 +119,16 @@ RUN case $(uname -m) in \
         cat /config-${KERNEL_SERIES}-$(uname -m)${EXTRA} >> ${KERNEL_DEF_CONF}; \
     fi; \
     sed -i "s/CONFIG_LOCALVERSION=\"-linuxkit\"/CONFIG_LOCALVERSION=\"-linuxkit${EXTRA}${DEBUG}\"/" ${KERNEL_DEF_CONF}; \
+    sed -i 's/CONFIG_GCC_PLUGIN_RANDSTRUCT=y/# CONFIG_GCC_PLUGIN_RANDSTRUCT is not set/' ${KERNEL_DEF_CONF}; \
+    sed -i 's/CONFIG_GCC_PLUGIN_RANDSTRUCT_PERFORMANCE=y/# CONFIG_GCC_PLUGIN_RANDSTRUCT_PERFORMANCE is not set/' ${KERNEL_DEF_CONF}; \
+    sed -i 's/CONFIG_BLK_DEV_DRBD=m/# CONFIG_BLK_DEV_DRBD is not set/' ${KERNEL_DEF_CONF}; \
     if [ -n "${DEBUG}" ]; then \
         sed -i 's/CONFIG_PANIC_ON_OOPS=y/# CONFIG_PANIC_ON_OOPS is not set/' ${KERNEL_DEF_CONF}; \
         cat /config${DEBUG} >> ${KERNEL_DEF_CONF}; \
     fi && \
     make defconfig && \
-    make oldconfig && \
-    if [ -z "${EXTRA}" ] && [ -z "${DEBUG}" ]; then diff -u .config ${KERNEL_DEF_CONF}; fi
-
+    make oldconfig
+    #if [ -z "${EXTRA}" ] && [ -z "${DEBUG}" ]; then diff -u .config ${KERNEL_DEF_CONF}; fi
 
 # Kernel
 RUN make -j "$(getconf _NPROCESSORS_ONLN)" KCFLAGS="-fno-pie" && \
